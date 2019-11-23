@@ -1,6 +1,7 @@
 import tweepy
 import os
 import numpy
+import time
 
 
 def make_pairs(_corpus):
@@ -26,9 +27,13 @@ auth = tweepy.OAuthHandler("2rv8quSAGzIWFrnJYQHVWpjjE", "Nl95hApe0FcovNkpjoZLjT5
 auth.set_access_token("1196697448648830976-Kc5zhNuUcHi5OA76OCJvhlB8GKDqUW", "t69KFABoyjjOAHClG4JzUB92vAlPEFmMh5B4kHQ1HSiwW")
 api = tweepy.API(auth)
 
+api.update_profile("clayton_bot", "", "", "bot: ON")
+print(api.get_user("clayton_bot").description)
+
 dwight = open('dwightquotes.txt', encoding='utf8').read()
 corpus = dwight.split()
 pairs = make_pairs(corpus)
+
 word_dict = {}
 first_words_list = []
 
@@ -43,32 +48,43 @@ for i in word_dict:
         for j in word_dict[i]:
             first_words_list.append(j)
 
-first_word = numpy.random.choice(first_words_list)
-chain = [first_word]
-n_sentences = numpy.random.randint(2, 4)
-current_num_sentences = 0
-result = ""
+
+def generate_text() -> str:
+    first_word = numpy.random.choice(first_words_list)
+    chain = [first_word]
+    n_sentences = numpy.random.randint(2, 4)
+    current_num_sentences = 0
+    result = ""
+
+    while current_num_sentences in range(n_sentences):
+        chain.append(numpy.random.choice(word_dict[chain[-1]]))
+        if "." in chain[len(chain) - 1]:
+            current_num_sentences += 1
+
+    for i in range(len(chain)):
+        result += chain[i] + " "
+
+    return result
 
 
-while current_num_sentences in range(n_sentences):
-    chain.append(numpy.random.choice(word_dict[chain[-1]]))
-    if "." in chain[len(chain) - 1]:
-        current_num_sentences += 1
-
-
-for i in range(len(chain)):
-    result += chain[i] + " "
-
-if os.stat('last_seen_id.txt').st_size != 0:
-    last_seen_id = retrieve_last_seen_id('last_seen_id.txt')
-    mentions = api.mentions_timeline(last_seen_id)
-else:
-    mentions = api.mentions_timeline()
-
-for mention in reversed(mentions):
-    store_last_seen_id(mention.id, 'last_seen_id.txt')
-    if "#dwigtschrudequote" in mention.text.lower():
-        print("found #")
-        api.update_status('@' + mention.user.screen_name + ' ' + result, mention.id)
+def reply_to_mentions():
+    if os.stat('last_seen_id.txt').st_size != 0:
+        last_seen_id = retrieve_last_seen_id('last_seen_id.txt')
+        mentions = api.mentions_timeline(last_seen_id)
     else:
-        print('didnt contain #')
+        mentions = api.mentions_timeline()
+
+    for mention in reversed(mentions):
+        store_last_seen_id(mention.id, 'last_seen_id.txt')
+        if "#dwigtschrudequote" in mention.text.lower():
+            print("found #")
+            api.update_status('.@' + mention.user.screen_name + ' ' + generate_text(), mention.id)
+        elif "#turnoff" in mention.text.lower():
+            print('shutting down')
+            api.update_profile("clayton_bot", "", "", "bot: OFF")
+            quit()
+
+
+while True:
+    reply_to_mentions()
+    time.sleep(15)
